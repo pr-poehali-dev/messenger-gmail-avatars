@@ -93,6 +93,8 @@ const Index = () => {
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
   const [editName, setEditName] = useState('');
   const [editStatus, setEditStatus] = useState<UserStatus>('online');
+  const [isMyProfileOpen, setIsMyProfileOpen] = useState(false);
+  const [isInventoryOpen, setIsInventoryOpen] = useState(false);
 
   const [channels, setChannels] = useState<Channel[]>([
     { id: 'rules', name: 'Правила', isPinned: true, isAdminOnly: true, icon: 'ScrollText' },
@@ -286,17 +288,34 @@ const Index = () => {
         ? { 
             ...u, 
             balance: u.balance - item.price,
-            purchasedItems: [...u.purchasedItems, item.id],
-            ...(item.type === 'avatar-frame' && { avatarFrame: item.preview }),
-            ...(item.type === 'background' && { background: item.preview }),
-            ...(item.type === 'emoji' && { decorations: [...u.decorations, item.icon] })
+            purchasedItems: [...u.purchasedItems, item.id]
           }
         : u
     ));
 
     toast({ 
       title: 'Покупка успешна!', 
-      description: `Вы купили ${item.name}` 
+      description: `Вы купили ${item.name}. Установите его в инвентаре` 
+    });
+  };
+
+  const handleEquipItem = (item: ShopItem) => {
+    if (!currentUser) return;
+
+    setUsers(prev => prev.map(u => 
+      u.id === currentUserId 
+        ? { 
+            ...u,
+            ...(item.type === 'avatar-frame' && { avatarFrame: item.preview }),
+            ...(item.type === 'background' && { background: item.preview }),
+            ...(item.type === 'emoji' && { decorations: [...u.decorations.filter(d => d !== item.icon), item.icon] })
+          }
+        : u
+    ));
+
+    toast({ 
+      title: 'Предмет установлен!', 
+      description: `${item.name} активирован` 
     });
   };
 
@@ -360,7 +379,7 @@ const Index = () => {
               <Input
                 id="email"
                 type="email"
-                placeholder="admin@messenger.com"
+                placeholder="example@messenger.com"
                 value={loginEmail}
                 onChange={(e) => setLoginEmail(e.target.value)}
                 className="bg-card/50"
@@ -384,11 +403,7 @@ const Index = () => {
             >
               Войти
             </Button>
-            <div className="text-xs text-muted-foreground text-center space-y-1 mt-4">
-              <p>Тестовые аккаунты:</p>
-              <p>admin@messenger.com / admin123</p>
-              <p>user@messenger.com / user123</p>
-            </div>
+
           </div>
         </Card>
       </div>
@@ -416,12 +431,174 @@ const Index = () => {
                 </div>
               )}
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-semibold truncate text-primary neon-glow">{currentUser.name}</p>
-              <Badge className={`${getRoleBadgeColor(currentUser.role)} text-xs mt-1`}>
-                {getRoleLabel(currentUser.role)}
-              </Badge>
-            </div>
+            <Sheet open={isMyProfileOpen} onOpenChange={setIsMyProfileOpen}>
+              <SheetTrigger asChild>
+                <button className="flex-1 min-w-0 text-left">
+                  <p className="font-semibold truncate text-primary neon-glow">{currentUser.name}</p>
+                  <Badge className={`${getRoleBadgeColor(currentUser.role)} text-xs mt-1`}>
+                    {getRoleLabel(currentUser.role)}
+                  </Badge>
+                </button>
+              </SheetTrigger>
+              <SheetContent className="glass-effect border-border/50">
+                <SheetHeader>
+                  <SheetTitle className="text-primary neon-glow">Мой профиль</SheetTitle>
+                  <SheetDescription>Ваши данные и статистика</SheetDescription>
+                </SheetHeader>
+                <div className="mt-6 space-y-4">
+                  <div className="flex justify-center">
+                    <div className="relative">
+                      <Avatar className={`w-24 h-24 ${currentUser.avatarFrame || 'ring-4 ring-primary/50'}`}>
+                        <AvatarImage src={currentUser.avatar} />
+                        <AvatarFallback className="bg-primary/20 text-primary text-3xl">
+                          {currentUser.name[0]}
+                        </AvatarFallback>
+                      </Avatar>
+                      {currentUser.decorations.length > 0 && (
+                        <div className="absolute -top-2 -right-2 text-3xl">
+                          {currentUser.decorations[0]}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Имя:</span>
+                      <span className="font-semibold">{currentUser.name}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Email:</span>
+                      <span className="text-sm">{currentUser.email}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Роль:</span>
+                      <Badge className={getRoleBadgeColor(currentUser.role)}>
+                        {getRoleLabel(currentUser.role)}
+                      </Badge>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Баланс:</span>
+                      <span className="font-bold text-primary">{currentUser.balance} ⊂⊃</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Куплено предметов:</span>
+                      <span className="font-semibold">{currentUser.purchasedItems.length}</span>
+                    </div>
+                  </div>
+                  <div className="pt-4 space-y-2">
+                    <Dialog open={isInventoryOpen} onOpenChange={setIsInventoryOpen}>
+                      <DialogTrigger asChild>
+                        <Button className="w-full bg-primary hover:bg-primary/90">
+                          <Icon name="Package" size={16} className="mr-2" />
+                          Инвентарь ({currentUser.purchasedItems.length})
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="glass-effect border-border/50 max-w-3xl">
+                        <DialogHeader>
+                          <DialogTitle className="text-primary neon-glow text-2xl">Инвентарь</DialogTitle>
+                          <DialogDescription>Ваши купленные предметы - нажмите чтобы установить</DialogDescription>
+                        </DialogHeader>
+                        <ScrollArea className="h-96 pr-4">
+                          {currentUser.purchasedItems.length === 0 ? (
+                            <div className="text-center py-12 text-muted-foreground">
+                              <Icon name="Package" size={48} className="mx-auto mb-4 opacity-50" />
+                              <p>Инвентарь пуст</p>
+                              <p className="text-sm">Купите предметы в магазине</p>
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-3 gap-4">
+                              {shopItems.filter(item => currentUser.purchasedItems.includes(item.id)).map(item => (
+                                <Card key={item.id} className="p-4 glass-effect border-primary/30 hover:border-primary/60 transition-all cursor-pointer" onClick={() => handleEquipItem(item)}>
+                                  <div className="text-center space-y-2">
+                                    {item.type === 'avatar-frame' ? (
+                                      <Avatar className={`w-16 h-16 mx-auto ${item.preview}`}>
+                                        <AvatarFallback className="bg-primary/20 text-primary text-xl">
+                                          {item.icon}
+                                        </AvatarFallback>
+                                      </Avatar>
+                                    ) : item.type === 'background' ? (
+                                      <div className={`w-full h-16 rounded-lg ${item.preview} flex items-center justify-center text-2xl`}>
+                                        {item.icon}
+                                      </div>
+                                    ) : (
+                                      <div className="text-4xl">{item.icon}</div>
+                                    )}
+                                    <h3 className="font-semibold text-sm">{item.name}</h3>
+                                    <Button 
+                                      size="sm"
+                                      className="w-full bg-primary hover:bg-primary/90"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleEquipItem(item);
+                                      }}
+                                    >
+                                      Установить
+                                    </Button>
+                                  </div>
+                                </Card>
+                              ))}
+                            </div>
+                          )}
+                        </ScrollArea>
+                      </DialogContent>
+                    </Dialog>
+                    <Dialog open={isEditProfileOpen} onOpenChange={setIsEditProfileOpen}>
+                      <DialogTrigger asChild>
+                        <Button 
+                          variant="outline" 
+                          className="w-full"
+                          onClick={() => {
+                            setEditName(currentUser.name);
+                            setEditStatus(currentUser.status);
+                          }}
+                        >
+                          <Icon name="Settings" size={16} className="mr-2" />
+                          Редактировать профиль
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="glass-effect border-border/50">
+                        <DialogHeader>
+                          <DialogTitle className="text-primary neon-glow">Редактировать профиль</DialogTitle>
+                        </DialogHeader>
+                        <div className="space-y-4 py-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="edit-name">Имя</Label>
+                            <Input
+                              id="edit-name"
+                              value={editName}
+                              onChange={(e) => setEditName(e.target.value)}
+                              className="bg-card/50"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="edit-status">Статус</Label>
+                            <Select value={editStatus} onValueChange={(value) => setEditStatus(value as UserStatus)}>
+                              <SelectTrigger className="bg-card/50">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="online">В сети</SelectItem>
+                                <SelectItem value="busy">Занят</SelectItem>
+                                <SelectItem value="invisible">Невидимка</SelectItem>
+                                <SelectItem value="offline">Не в сети</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                        <DialogFooter>
+                          <Button variant="outline" onClick={() => setIsEditProfileOpen(false)}>
+                            Отмена
+                          </Button>
+                          <Button onClick={handleEditProfile} className="bg-primary hover:bg-primary/90">
+                            Сохранить
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+                </div>
+              </SheetContent>
+            </Sheet>
           </div>
           <div className="flex items-center justify-between p-2 rounded-lg bg-card/50 mb-2">
             <span className="text-sm text-muted-foreground">Баланс:</span>
@@ -465,58 +642,6 @@ const Index = () => {
                   </Button>
                   <Button onClick={handleBuyCurrency} className="bg-primary hover:bg-primary/90">
                     Оплатить
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-            <Dialog open={isEditProfileOpen} onOpenChange={setIsEditProfileOpen}>
-              <DialogTrigger asChild>
-                <Button 
-                  size="sm" 
-                  variant="outline"
-                  onClick={() => {
-                    setEditName(currentUser.name);
-                    setEditStatus(currentUser.status);
-                  }}
-                >
-                  <Icon name="Settings" size={14} />
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="glass-effect border-border/50">
-                <DialogHeader>
-                  <DialogTitle className="text-primary neon-glow">Редактировать профиль</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="edit-name">Имя</Label>
-                    <Input
-                      id="edit-name"
-                      value={editName}
-                      onChange={(e) => setEditName(e.target.value)}
-                      className="bg-card/50"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="edit-status">Статус</Label>
-                    <Select value={editStatus} onValueChange={(value) => setEditStatus(value as UserStatus)}>
-                      <SelectTrigger className="bg-card/50">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="online">В сети</SelectItem>
-                        <SelectItem value="busy">Занят</SelectItem>
-                        <SelectItem value="invisible">Невидимка</SelectItem>
-                        <SelectItem value="offline">Не в сети</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setIsEditProfileOpen(false)}>
-                    Отмена
-                  </Button>
-                  <Button onClick={handleEditProfile} className="bg-primary hover:bg-primary/90">
-                    Сохранить
                   </Button>
                 </DialogFooter>
               </DialogContent>
@@ -782,10 +907,10 @@ const Index = () => {
                             <p className="text-xl font-bold text-primary neon-glow">{item.price} ⊂⊃</p>
                             <Button 
                               className="w-full bg-primary hover:bg-primary/90"
-                              disabled={currentUser.balance < item.price || currentUser.purchasedItems.includes(item.id)}
-                              onClick={() => handlePurchaseItem(item)}
+                              disabled={!currentUser.purchasedItems.includes(item.id) && currentUser.balance < item.price}
+                              onClick={() => currentUser.purchasedItems.includes(item.id) ? handleEquipItem(item) : handlePurchaseItem(item)}
                             >
-                              {currentUser.purchasedItems.includes(item.id) ? 'Куплено' : 'Купить'}
+                              {currentUser.purchasedItems.includes(item.id) ? 'Установить' : 'Купить'}
                             </Button>
                           </div>
                         </Card>
@@ -805,10 +930,10 @@ const Index = () => {
                             <p className="text-xl font-bold text-primary neon-glow">{item.price} ⊂⊃</p>
                             <Button 
                               className="w-full bg-primary hover:bg-primary/90"
-                              disabled={currentUser.balance < item.price || currentUser.purchasedItems.includes(item.id)}
-                              onClick={() => handlePurchaseItem(item)}
+                              disabled={!currentUser.purchasedItems.includes(item.id) && currentUser.balance < item.price}
+                              onClick={() => currentUser.purchasedItems.includes(item.id) ? handleEquipItem(item) : handlePurchaseItem(item)}
                             >
-                              {currentUser.purchasedItems.includes(item.id) ? 'Куплено' : 'Купить'}
+                              {currentUser.purchasedItems.includes(item.id) ? 'Установить' : 'Купить'}
                             </Button>
                           </div>
                         </Card>
@@ -827,10 +952,10 @@ const Index = () => {
                             <Button 
                               size="sm"
                               className="w-full bg-primary hover:bg-primary/90"
-                              disabled={currentUser.balance < item.price || currentUser.purchasedItems.includes(item.id)}
-                              onClick={() => handlePurchaseItem(item)}
+                              disabled={!currentUser.purchasedItems.includes(item.id) && currentUser.balance < item.price}
+                              onClick={() => currentUser.purchasedItems.includes(item.id) ? handleEquipItem(item) : handlePurchaseItem(item)}
                             >
-                              {currentUser.purchasedItems.includes(item.id) ? 'Куплено' : 'Купить'}
+                              {currentUser.purchasedItems.includes(item.id) ? 'Установить' : 'Купить'}
                             </Button>
                           </div>
                         </Card>
