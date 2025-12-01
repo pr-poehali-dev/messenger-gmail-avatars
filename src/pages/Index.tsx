@@ -39,6 +39,7 @@ interface Message {
   content: string;
   timestamp: Date;
   channelId: string;
+  isEdited?: boolean;
 }
 
 interface Channel {
@@ -60,11 +61,23 @@ interface ShopItem {
   preview?: string;
 }
 
+interface GiftTransaction {
+  id: string;
+  giftId: string;
+  giftName: string;
+  giftIcon: string;
+  fromUserId: string;
+  fromUserName: string;
+  toUserId: string;
+  toUserName: string;
+  timestamp: Date;
+}
+
 const INITIAL_USERS: User[] = [
-  { id: '1', name: 'Космонавт', email: 'admin@messenger.com', password: 'admin123', role: 'admin', status: 'online', balance: 150, decorations: ['⭐', '🚀'], purchasedItems: [], avatarFrame: 'ring-primary' },
-  { id: '2', name: 'Модератор', email: 'mod@messenger.com', password: 'mod123', role: 'moderator', status: 'busy', balance: 80, decorations: ['🛡️'], purchasedItems: [] },
-  { id: '3', name: 'Наблюдатель', email: 'observer@messenger.com', password: 'obs123', role: 'observer', status: 'invisible', balance: 50, decorations: ['👁️'], purchasedItems: [] },
-  { id: '4', name: 'Пользователь', email: 'user@messenger.com', password: 'user123', role: 'user', status: 'online', balance: 20, decorations: [], purchasedItems: [] },
+  { id: '1', name: 'Космонавт', email: 'admin@messenger.com', password: 'admin123', role: 'admin', status: 'online', balance: 1500, decorations: ['⭐', '🚀'], purchasedItems: [], avatarFrame: 'ring-primary' },
+  { id: '2', name: 'Модератор', email: 'mod@messenger.com', password: 'mod123', role: 'moderator', status: 'busy', balance: 800, decorations: ['🛡️'], purchasedItems: [] },
+  { id: '3', name: 'Наблюдатель', email: 'observer@messenger.com', password: 'obs123', role: 'observer', status: 'invisible', balance: 500, decorations: ['👁️'], purchasedItems: [] },
+  { id: '4', name: 'Пользователь', email: 'user@messenger.com', password: 'user123', role: 'user', status: 'online', balance: 200, decorations: [], purchasedItems: [] },
 ];
 
 const Index = () => {
@@ -100,6 +113,11 @@ const Index = () => {
   const [editStatus, setEditStatus] = useState<UserStatus>('online');
   const [isMyProfileOpen, setIsMyProfileOpen] = useState(false);
   const [isInventoryOpen, setIsInventoryOpen] = useState(false);
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editMessageContent, setEditMessageContent] = useState('');
+  const [isGiftDialogOpen, setIsGiftDialogOpen] = useState(false);
+  const [selectedGiftRecipient, setSelectedGiftRecipient] = useState<string>('');
+  const [giftTransactions, setGiftTransactions] = useState<GiftTransaction[]>([]);
 
   const [channels, setChannels] = useState<Channel[]>([
     { id: 'rules', name: 'Правила', isPinned: true, isAdminOnly: true, icon: 'ScrollText' },
@@ -131,15 +149,44 @@ const Index = () => {
     { id: 'frame2', name: 'Огненная рамка', price: 100, type: 'avatar-frame', icon: '🔥', preview: 'ring-4 ring-orange-500' },
     { id: 'frame3', name: 'Ледяная рамка', price: 80, type: 'avatar-frame', icon: '❄️', preview: 'ring-4 ring-cyan-400' },
     { id: 'frame4', name: 'Радужная рамка', price: 150, type: 'avatar-frame', icon: '🌈', preview: 'ring-4 ring-purple-500' },
+    { id: 'frame5', name: 'Лавовая рамка', price: 200, type: 'avatar-frame', icon: '🌋', preview: 'ring-4 ring-red-600' },
+    { id: 'frame6', name: 'Изумрудная рамка', price: 180, type: 'avatar-frame', icon: '💚', preview: 'ring-4 ring-emerald-500' },
+    { id: 'frame7', name: 'Космическая рамка', price: 250, type: 'avatar-frame', icon: '🌠', preview: 'ring-4 ring-indigo-500' },
+    { id: 'frame8', name: 'Королевская рамка', price: 300, type: 'avatar-frame', icon: '👑', preview: 'ring-4 ring-amber-400' },
     { id: 'bg1', name: 'Звёздное небо', price: 120, type: 'background', icon: '🌌', preview: 'bg-gradient-to-br from-indigo-900 via-purple-900 to-pink-900' },
     { id: 'bg2', name: 'Неоновый город', price: 140, type: 'background', icon: '🏙️', preview: 'bg-gradient-to-br from-blue-900 via-indigo-800 to-purple-900' },
+    { id: 'bg3', name: 'Огненный закат', price: 160, type: 'background', icon: '🌅', preview: 'bg-gradient-to-br from-orange-600 via-red-600 to-pink-600' },
+    { id: 'bg4', name: 'Космос', price: 200, type: 'background', icon: '🚀', preview: 'bg-gradient-to-br from-black via-purple-900 to-blue-900' },
+    { id: 'bg5', name: 'Аврора', price: 180, type: 'background', icon: '🌈', preview: 'bg-gradient-to-br from-green-400 via-cyan-500 to-blue-500' },
+    { id: 'bg6', name: 'Лунная ночь', price: 220, type: 'background', icon: '🌙', preview: 'bg-gradient-to-br from-slate-800 via-blue-900 to-indigo-900' },
     { id: 'emoji1', name: 'Огонь', price: 30, type: 'emoji', icon: '🔥' },
     { id: 'emoji2', name: 'Звезда', price: 30, type: 'emoji', icon: '⭐' },
     { id: 'emoji3', name: 'Сердце', price: 30, type: 'emoji', icon: '💜' },
     { id: 'emoji4', name: 'Корона', price: 50, type: 'emoji', icon: '👑' },
     { id: 'emoji5', name: 'Алмаз', price: 70, type: 'emoji', icon: '💎' },
-    { id: 'gift1', name: 'Подарок', price: 80, type: 'gift', icon: '🎁' },
-    { id: 'gift2', name: 'Букет', price: 100, type: 'gift', icon: '💐' },
+    { id: 'emoji6', name: 'Молния', price: 40, type: 'emoji', icon: '⚡' },
+    { id: 'emoji7', name: 'Череп', price: 60, type: 'emoji', icon: '💀' },
+    { id: 'emoji8', name: 'Дракон', price: 90, type: 'emoji', icon: '🐉' },
+    { id: 'emoji9', name: 'Единорог', price: 100, type: 'emoji', icon: '🦄' },
+    { id: 'emoji10', name: 'Крылья', price: 80, type: 'emoji', icon: '👼' },
+    { id: 'gift1', name: 'Подарок', price: 50, type: 'gift', icon: '🎁' },
+    { id: 'gift2', name: 'Букет роз', price: 80, type: 'gift', icon: '💐' },
+    { id: 'gift3', name: 'Шоколад', price: 60, type: 'gift', icon: '🍫' },
+    { id: 'gift4', name: 'Торт', price: 100, type: 'gift', icon: '🎂' },
+    { id: 'gift5', name: 'Шампанское', price: 120, type: 'gift', icon: '🍾' },
+    { id: 'gift6', name: 'Бриллиант', price: 500, type: 'gift', icon: '💎' },
+    { id: 'gift7', name: 'Плюшевый мишка', price: 70, type: 'gift', icon: '🧸' },
+    { id: 'gift8', name: 'Воздушные шары', price: 40, type: 'gift', icon: '🎈' },
+    { id: 'gift9', name: 'Кубок', price: 200, type: 'gift', icon: '🏆' },
+    { id: 'gift10', name: 'Корона', price: 300, type: 'gift', icon: '👑' },
+    { id: 'gift11', name: 'Сердце', price: 150, type: 'gift', icon: '❤️' },
+    { id: 'gift12', name: 'Звезда', price: 250, type: 'gift', icon: '⭐' },
+    { id: 'gift13', name: 'Ракета', price: 400, type: 'gift', icon: '🚀' },
+    { id: 'gift14', name: 'Единорог', price: 350, type: 'gift', icon: '🦄' },
+    { id: 'gift15', name: 'Дракон', price: 450, type: 'gift', icon: '🐉' },
+    { id: 'gift16', name: 'Роза', price: 90, type: 'gift', icon: '🌹' },
+    { id: 'gift17', name: 'Кольцо', price: 280, type: 'gift', icon: '💍' },
+    { id: 'gift18', name: 'Мороженое', price: 35, type: 'gift', icon: '🍦' },
   ];
 
   useEffect(() => {
@@ -292,15 +339,9 @@ const Index = () => {
 
     const price = amount / 2;
     
-    setUsers(prev => prev.map(u => 
-      u.id === currentUserId 
-        ? { ...u, balance: u.balance + amount }
-        : u
-    ));
-
     toast({ 
-      title: 'Валюта куплена!', 
-      description: `Вы получили ${amount} ⊂⊃ за ${price}₽` 
+      title: 'Переход к оплате', 
+      description: `Сумма: ${price}₽. Интеграция с платежной системой будет добавлена позже` 
     });
     
     setBuyCurrencyAmount('');
@@ -382,11 +423,78 @@ const Index = () => {
       userAvatar: currentUser.avatar,
       content: messageInput,
       timestamp: new Date(),
-      channelId: selectedChannel
+      channelId: selectedChannel,
+      isEdited: false
     };
 
     setMessages(prev => [...prev, newMessage]);
     setMessageInput('');
+  };
+
+  const handleEditMessage = (messageId: string) => {
+    const message = messages.find(m => m.id === messageId);
+    if (message) {
+      setEditingMessageId(messageId);
+      setEditMessageContent(message.content);
+    }
+  };
+
+  const handleSaveEditMessage = () => {
+    if (!editMessageContent.trim()) return;
+
+    setMessages(prev => prev.map(m => 
+      m.id === editingMessageId 
+        ? { ...m, content: editMessageContent, isEdited: true }
+        : m
+    ));
+
+    toast({ title: 'Сообщение изменено' });
+    setEditingMessageId(null);
+    setEditMessageContent('');
+  };
+
+  const handleDeleteMessage = (messageId: string) => {
+    setMessages(prev => prev.filter(m => m.id !== messageId));
+    toast({ title: 'Сообщение удалено' });
+  };
+
+  const handleSendGift = (giftItem: ShopItem, recipientId: string) => {
+    if (!currentUser) return;
+    
+    if (currentUser.balance < giftItem.price) {
+      toast({ title: 'Недостаточно средств', description: 'Пополните баланс', variant: 'destructive' });
+      return;
+    }
+
+    const recipient = users.find(u => u.id === recipientId);
+    if (!recipient) return;
+
+    setUsers(prev => prev.map(u => 
+      u.id === currentUserId 
+        ? { ...u, balance: u.balance - giftItem.price }
+        : u
+    ));
+
+    const transaction: GiftTransaction = {
+      id: Date.now().toString(),
+      giftId: giftItem.id,
+      giftName: giftItem.name,
+      giftIcon: giftItem.icon,
+      fromUserId: currentUser.id,
+      fromUserName: currentUser.name,
+      toUserId: recipientId,
+      toUserName: recipient.name,
+      timestamp: new Date()
+    };
+
+    setGiftTransactions(prev => [...prev, transaction]);
+
+    toast({ 
+      title: 'Подарок отправлен!', 
+      description: `${recipient.name} получил ${giftItem.name}` 
+    });
+    
+    setIsGiftDialogOpen(false);
   };
 
   const handleStartDM = (userId: string) => {
@@ -410,10 +518,16 @@ const Index = () => {
     setSelectedChannel(dmChannelId);
   };
 
-  const filteredUsers = users.filter(user => 
-    user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    user.email.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredUsers = users.filter(user => {
+    const matchesSearch = user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      user.email.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    if (currentUser?.role === 'user') {
+      return matchesSearch && user.role === 'user';
+    }
+    
+    return matchesSearch;
+  });
 
   const currentChannelMessages = messages.filter(m => m.channelId === selectedChannel);
   const selectedChannelInfo = channels.find(c => c.id === selectedChannel);
@@ -886,13 +1000,64 @@ const Index = () => {
                         </div>
                         
                         {user.id !== currentUser.id && (
-                          <Button 
-                            className="w-full bg-primary hover:bg-primary/90"
-                            onClick={() => handleStartDM(user.id)}
-                          >
-                            <Icon name="MessageCircle" size={16} className="mr-2" />
-                            Написать сообщение
-                          </Button>
+                          <>
+                            <Button 
+                              className="w-full bg-primary hover:bg-primary/90"
+                              onClick={() => handleStartDM(user.id)}
+                            >
+                              <Icon name="MessageCircle" size={16} className="mr-2" />
+                              Написать сообщение
+                            </Button>
+                            <Dialog open={isGiftDialogOpen && selectedGiftRecipient === user.id} onOpenChange={(open) => {
+                              setIsGiftDialogOpen(open);
+                              if (!open) setSelectedGiftRecipient('');
+                            }}>
+                              <DialogTrigger asChild>
+                                <Button 
+                                  variant="outline"
+                                  className="w-full"
+                                  onClick={() => {
+                                    setSelectedGiftRecipient(user.id);
+                                    setIsGiftDialogOpen(true);
+                                  }}
+                                >
+                                  <Icon name="Gift" size={16} className="mr-2" />
+                                  Подарить подарок
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent className="glass-effect border-border/50 max-w-2xl max-h-[80vh]">
+                                <DialogHeader>
+                                  <DialogTitle className="text-primary neon-glow">Отправить подарок</DialogTitle>
+                                  <DialogDescription>Выберите подарок для {user.name}</DialogDescription>
+                                </DialogHeader>
+                                <ScrollArea className="h-[400px] pr-4">
+                                  <div className="grid grid-cols-3 gap-3">
+                                    {shopItems.filter(i => i.type === 'gift').map(giftItem => (
+                                      <Card key={giftItem.id} className="p-3 glass-effect border-primary/30 hover:border-primary/60 transition-all">
+                                        <div className="text-center space-y-2">
+                                          <div className="text-4xl">{giftItem.icon}</div>
+                                          <h3 className="font-semibold text-xs">{giftItem.name}</h3>
+                                          <p className="text-sm font-bold text-primary neon-glow">{giftItem.price} ⊂⊃</p>
+                                          <Button 
+                                            size="sm"
+                                            className="w-full bg-primary hover:bg-primary/90"
+                                            disabled={currentUser.balance < giftItem.price}
+                                            onClick={() => {
+                                              handleSendGift(giftItem, user.id);
+                                              setIsGiftDialogOpen(false);
+                                              setSelectedGiftRecipient('');
+                                            }}
+                                          >
+                                            Подарить
+                                          </Button>
+                                        </div>
+                                      </Card>
+                                    ))}
+                                  </div>
+                                </ScrollArea>
+                              </DialogContent>
+                            </Dialog>
+                          </>
                         )}
 
                         {currentUser.role === 'admin' && (
@@ -1091,20 +1256,14 @@ const Index = () => {
                   </TabsContent>
 
                   <TabsContent value="gifts">
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-3 gap-4">
                       {shopItems.filter(i => i.type === 'gift').map(item => (
                         <Card key={item.id} className="p-4 glass-effect border-primary/30 hover:border-primary/60 transition-all">
                           <div className="text-center space-y-3">
-                            <div className="text-5xl">{item.icon}</div>
-                            <h3 className="font-semibold">{item.name}</h3>
-                            <p className="text-xl font-bold text-primary neon-glow">{item.price} ⊂⊃</p>
-                            <Button 
-                              className="w-full bg-primary hover:bg-primary/90"
-                              disabled={currentUser.balance < item.price}
-                              onClick={() => handlePurchaseItem(item)}
-                            >
-                              Подарить
-                            </Button>
+                            <div className="text-4xl">{item.icon}</div>
+                            <h3 className="font-semibold text-sm">{item.name}</h3>
+                            <p className="text-lg font-bold text-primary neon-glow">{item.price} ⊂⊃</p>
+                            <p className="text-xs text-muted-foreground">Только дарить</p>
                           </div>
                         </Card>
                       ))}
@@ -1162,13 +1321,45 @@ const Index = () => {
                       {message.timestamp.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </div>
-                  <div className="text-sm whitespace-pre-wrap bg-card/30 p-3 rounded-lg">
-                    {message.content}
-                  </div>
+                  {editingMessageId === message.id ? (
+                    <div className="space-y-2">
+                      <Input
+                        value={editMessageContent}
+                        onChange={(e) => setEditMessageContent(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleSaveEditMessage()}
+                        className="bg-card/50"
+                      />
+                      <div className="flex gap-2">
+                        <Button size="sm" onClick={handleSaveEditMessage} className="bg-primary hover:bg-primary/90">
+                          Сохранить
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => setEditingMessageId(null)}>
+                          Отмена
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-sm whitespace-pre-wrap bg-card/30 p-3 rounded-lg">
+                      {message.content}
+                      {message.isEdited && (
+                        <span className="text-xs text-muted-foreground ml-2">(изменено)</span>
+                      )}
+                    </div>
+                  )}
                 </div>
-                {currentUser.role !== 'user' && (
+                {message.userId === currentUser.id && editingMessageId !== message.id && (
+                  <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                    <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-card/50" onClick={() => handleEditMessage(message.id)}>
+                      <Icon name="Edit" size={16} />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/20" onClick={() => handleDeleteMessage(message.id)}>
+                      <Icon name="Trash2" size={16} />
+                    </Button>
+                  </div>
+                )}
+                {currentUser.role !== 'user' && message.userId !== currentUser.id && (
                   <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/20">
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/20" onClick={() => handleDeleteMessage(message.id)}>
                       <Icon name="Trash2" size={16} />
                     </Button>
                   </div>
