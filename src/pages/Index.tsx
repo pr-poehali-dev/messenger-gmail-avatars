@@ -69,8 +69,13 @@ const INITIAL_USERS: User[] = [
 
 const Index = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isRegisterMode, setIsRegisterMode] = useState(false);
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
+  const [registerName, setRegisterName] = useState('');
+  const [registerEmail, setRegisterEmail] = useState('');
+  const [registerPassword, setRegisterPassword] = useState('');
+  const [registerPasswordConfirm, setRegisterPasswordConfirm] = useState('');
   const [currentUserId, setCurrentUserId] = useState<string>('');
   
   const [users, setUsers] = useState<User[]>(() => {
@@ -161,6 +166,54 @@ const Index = () => {
     } else {
       toast({ title: 'Ошибка', description: 'Неверный email или пароль', variant: 'destructive' });
     }
+  };
+
+  const handleRegister = () => {
+    if (!registerName.trim()) {
+      toast({ title: 'Ошибка', description: 'Укажите имя', variant: 'destructive' });
+      return;
+    }
+    if (!registerEmail.trim() || !registerEmail.includes('@')) {
+      toast({ title: 'Ошибка', description: 'Укажите корректный email', variant: 'destructive' });
+      return;
+    }
+    if (registerPassword.length < 6) {
+      toast({ title: 'Ошибка', description: 'Пароль должен быть минимум 6 символов', variant: 'destructive' });
+      return;
+    }
+    if (registerPassword !== registerPasswordConfirm) {
+      toast({ title: 'Ошибка', description: 'Пароли не совпадают', variant: 'destructive' });
+      return;
+    }
+    if (users.find(u => u.email === registerEmail)) {
+      toast({ title: 'Ошибка', description: 'Пользователь с таким email уже существует', variant: 'destructive' });
+      return;
+    }
+
+    const newUser: User = {
+      id: Date.now().toString(),
+      name: registerName,
+      email: registerEmail,
+      password: registerPassword,
+      role: 'user',
+      status: 'online',
+      balance: 0,
+      decorations: [],
+      purchasedItems: []
+    };
+
+    setUsers(prev => [...prev, newUser]);
+    setCurrentUserId(newUser.id);
+    setIsLoggedIn(true);
+    localStorage.setItem('current_user_id', newUser.id);
+    
+    toast({ title: 'Регистрация успешна!', description: `Добро пожаловать, ${newUser.name}!` });
+    
+    setRegisterName('');
+    setRegisterEmail('');
+    setRegisterPassword('');
+    setRegisterPasswordConfirm('');
+    setIsRegisterMode(false);
   };
 
   const handleLogout = () => {
@@ -370,41 +423,115 @@ const Index = () => {
       <div className="min-h-screen flex items-center justify-center bg-[#0A0E27] px-4">
         <Card className="w-full max-w-md p-8 glass-effect border-primary/30">
           <div className="text-center mb-8">
-            <h1 className="text-4xl font-bold text-primary neon-glow mb-2">Вход в мессенджер</h1>
-            <p className="text-muted-foreground">Войдите в свой аккаунт</p>
+            <h1 className="text-4xl font-bold text-primary neon-glow mb-2">
+              {isRegisterMode ? 'Регистрация' : 'Вход в мессенджер'}
+            </h1>
+            <p className="text-muted-foreground">
+              {isRegisterMode ? 'Создайте новый аккаунт' : 'Войдите в свой аккаунт'}
+            </p>
           </div>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="example@messenger.com"
-                value={loginEmail}
-                onChange={(e) => setLoginEmail(e.target.value)}
-                className="bg-card/50"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Пароль</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••"
-                value={loginPassword}
-                onChange={(e) => setLoginPassword(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
-                className="bg-card/50"
-              />
-            </div>
-            <Button 
-              onClick={handleLogin}
-              className="w-full bg-primary hover:bg-primary/90 neon-border"
-            >
-              Войти
-            </Button>
 
-          </div>
+          {isRegisterMode ? (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="register-name">Имя</Label>
+                <Input
+                  id="register-name"
+                  type="text"
+                  placeholder="Ваше имя"
+                  value={registerName}
+                  onChange={(e) => setRegisterName(e.target.value)}
+                  className="bg-card/50"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="register-email">Email</Label>
+                <Input
+                  id="register-email"
+                  type="email"
+                  placeholder="example@messenger.com"
+                  value={registerEmail}
+                  onChange={(e) => setRegisterEmail(e.target.value)}
+                  className="bg-card/50"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="register-password">Пароль</Label>
+                <Input
+                  id="register-password"
+                  type="password"
+                  placeholder="Минимум 6 символов"
+                  value={registerPassword}
+                  onChange={(e) => setRegisterPassword(e.target.value)}
+                  className="bg-card/50"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="register-password-confirm">Подтвердите пароль</Label>
+                <Input
+                  id="register-password-confirm"
+                  type="password"
+                  placeholder="Повторите пароль"
+                  value={registerPasswordConfirm}
+                  onChange={(e) => setRegisterPasswordConfirm(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleRegister()}
+                  className="bg-card/50"
+                />
+              </div>
+              <Button 
+                onClick={handleRegister}
+                className="w-full bg-primary hover:bg-primary/90 neon-border"
+              >
+                Зарегистрироваться
+              </Button>
+              <Button 
+                onClick={() => setIsRegisterMode(false)}
+                variant="outline"
+                className="w-full"
+              >
+                Уже есть аккаунт? Войти
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="example@messenger.com"
+                  value={loginEmail}
+                  onChange={(e) => setLoginEmail(e.target.value)}
+                  className="bg-card/50"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password">Пароль</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="••••••"
+                  value={loginPassword}
+                  onChange={(e) => setLoginPassword(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+                  className="bg-card/50"
+                />
+              </div>
+              <Button 
+                onClick={handleLogin}
+                className="w-full bg-primary hover:bg-primary/90 neon-border"
+              >
+                Войти
+              </Button>
+              <Button 
+                onClick={() => setIsRegisterMode(true)}
+                variant="outline"
+                className="w-full"
+              >
+                Нет аккаунта? Зарегистрироваться
+              </Button>
+            </div>
+          )}
         </Card>
       </div>
     );
