@@ -13,7 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/components/ui/use-toast';
 
-type UserRole = 'admin' | 'moderator' | 'observer' | 'user';
+type UserRole = 'admin' | 'moderator' | 'observer' | 'user' | 'helper';
 type UserStatus = 'online' | 'offline' | 'invisible' | 'busy';
 
 interface User {
@@ -29,6 +29,7 @@ interface User {
   avatarFrame?: string;
   background?: string;
   purchasedItems: string[];
+  receivedGifts: ReceivedGift[];
 }
 
 interface Message {
@@ -40,6 +41,19 @@ interface Message {
   timestamp: Date;
   channelId: string;
   isEdited?: boolean;
+  editedAt?: Date;
+  imageUrl?: string;
+}
+
+interface ReceivedGift {
+  id: string;
+  giftId: string;
+  giftName: string;
+  giftIcon: string;
+  giftPrice: number;
+  fromUserId: string;
+  fromUserName: string;
+  receivedAt: Date;
 }
 
 interface Channel {
@@ -61,23 +75,23 @@ interface ShopItem {
   preview?: string;
 }
 
-interface GiftTransaction {
+interface SupportRequest {
   id: string;
-  giftId: string;
-  giftName: string;
-  giftIcon: string;
-  fromUserId: string;
-  fromUserName: string;
-  toUserId: string;
-  toUserName: string;
-  timestamp: Date;
+  userId: string;
+  userName: string;
+  question: string;
+  answer?: string;
+  answeredBy?: string;
+  status: 'pending' | 'answered';
+  createdAt: Date;
+  answeredAt?: Date;
 }
 
 const INITIAL_USERS: User[] = [
-  { id: '1', name: 'Космонавт', email: 'admin@messenger.com', password: 'admin123', role: 'admin', status: 'online', balance: 1500, decorations: ['⭐', '🚀'], purchasedItems: [], avatarFrame: 'ring-primary' },
-  { id: '2', name: 'Модератор', email: 'mod@messenger.com', password: 'mod123', role: 'moderator', status: 'busy', balance: 800, decorations: ['🛡️'], purchasedItems: [] },
-  { id: '3', name: 'Наблюдатель', email: 'observer@messenger.com', password: 'obs123', role: 'observer', status: 'invisible', balance: 500, decorations: ['👁️'], purchasedItems: [] },
-  { id: '4', name: 'Пользователь', email: 'user@messenger.com', password: 'user123', role: 'user', status: 'online', balance: 200, decorations: [], purchasedItems: [] },
+  { id: '1', name: 'Космонавт', email: 'admin@messenger.com', password: 'admin123', role: 'admin', status: 'online', balance: 1500, decorations: ['⭐', '🚀'], purchasedItems: [], receivedGifts: [], avatarFrame: 'ring-primary' },
+  { id: '2', name: 'Модератор', email: 'mod@messenger.com', password: 'mod123', role: 'moderator', status: 'busy', balance: 800, decorations: ['🛡️'], purchasedItems: [], receivedGifts: [] },
+  { id: '3', name: 'Наблюдатель', email: 'observer@messenger.com', password: 'obs123', role: 'observer', status: 'invisible', balance: 500, decorations: ['👁️'], purchasedItems: [], receivedGifts: [] },
+  { id: '4', name: 'Пользователь', email: 'user@messenger.com', password: 'user123', role: 'user', status: 'online', balance: 200, decorations: [], receivedGifts: [], purchasedItems: [] },
 ];
 
 const Index = () => {
@@ -113,16 +127,22 @@ const Index = () => {
   const [editStatus, setEditStatus] = useState<UserStatus>('online');
   const [isMyProfileOpen, setIsMyProfileOpen] = useState(false);
   const [isInventoryOpen, setIsInventoryOpen] = useState(false);
-  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
-  const [editMessageContent, setEditMessageContent] = useState('');
+  const [editingMessageId, setEditingMessageId] = useState<string>('');
+  const [editedMessageContent, setEditedMessageContent] = useState('');
   const [isGiftDialogOpen, setIsGiftDialogOpen] = useState(false);
-  const [selectedGiftRecipient, setSelectedGiftRecipient] = useState<string>('');
-  const [giftTransactions, setGiftTransactions] = useState<GiftTransaction[]>([]);
+  const [giftRecipientId, setGiftRecipientId] = useState('');
+  const [selectedGiftId, setSelectedGiftId] = useState('');
+  const [isReceivedGiftsOpen, setIsReceivedGiftsOpen] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [aiThinking, setAiThinking] = useState(false);
 
   const [channels, setChannels] = useState<Channel[]>([
     { id: 'rules', name: 'Правила', isPinned: true, isAdminOnly: true, icon: 'ScrollText' },
     { id: 'general', name: 'Общий', isPinned: false, isAdminOnly: false, icon: 'MessageSquare' },
     { id: 'announcements', name: 'Объявления', isPinned: false, isAdminOnly: true, icon: 'Megaphone' },
+    { id: 'ai-helper', name: 'AI Помощник', isPinned: true, isAdminOnly: false, icon: 'Bot' },
+    { id: 'support', name: 'Обратиться за помощью', isPinned: true, isAdminOnly: false, icon: 'Headset' },
   ]);
 
   const [messages, setMessages] = useState<Message[]>([
@@ -246,7 +266,8 @@ const Index = () => {
       status: 'online',
       balance: 0,
       decorations: [],
-      purchasedItems: []
+      purchasedItems: [],
+      receivedGifts: []
     };
 
     setUsers(prev => [...prev, newUser]);
@@ -285,6 +306,7 @@ const Index = () => {
       case 'admin': return 'bg-[hsl(var(--neon-blue))] text-white';
       case 'moderator': return 'bg-[hsl(var(--neon-pink))] text-white';
       case 'observer': return 'bg-[hsl(var(--neon-green))] text-white';
+      case 'helper': return 'bg-accent text-white';
       default: return 'bg-muted text-muted-foreground';
     }
   };
@@ -303,6 +325,7 @@ const Index = () => {
       case 'admin': return 'Админ';
       case 'moderator': return 'Модератор';
       case 'observer': return 'Наблюдатель';
+      case 'helper': return 'Помощник';
       default: return 'Пользователь';
     }
   };
@@ -416,6 +439,20 @@ const Index = () => {
   const handleSendMessage = () => {
     if (!messageInput.trim() || !currentUser) return;
 
+    // Edit mode: update existing message
+    if (editingMessageId) {
+      setMessages(prev => prev.map(m => 
+        m.id === editingMessageId 
+          ? { ...m, content: messageInput, isEdited: true, editedAt: new Date() }
+          : m
+      ));
+      toast({ title: 'Сообщение изменено' });
+      setEditingMessageId('');
+      setMessageInput('');
+      return;
+    }
+
+    // Create new message
     const newMessage: Message = {
       id: Date.now().toString(),
       userId: currentUser.id,
@@ -429,28 +466,42 @@ const Index = () => {
 
     setMessages(prev => [...prev, newMessage]);
     setMessageInput('');
-  };
 
-  const handleEditMessage = (messageId: string) => {
-    const message = messages.find(m => m.id === messageId);
-    if (message) {
-      setEditingMessageId(messageId);
-      setEditMessageContent(message.content);
+    // AI auto-response for ai-helper channel
+    if (selectedChannel === 'ai-helper') {
+      setAiThinking(true);
+      setTimeout(() => {
+        const aiResponse: Message = {
+          id: Date.now().toString(),
+          userId: 'ai-bot',
+          userName: 'AI Помощник',
+          content: 'Я всё ещё учусь и не могу предоставить полноценную помощь. Для реальной помощи обратитесь в канал "Обратиться за помощью" 🤖',
+          timestamp: new Date(),
+          channelId: selectedChannel
+        };
+        setMessages(prev => [...prev, aiResponse]);
+        setAiThinking(false);
+      }, 1500);
     }
   };
 
+  const handleEditMessage = (message: Message) => {
+    setEditingMessageId(message.id);
+    setEditedMessageContent(message.content);
+  };
+
   const handleSaveEditMessage = () => {
-    if (!editMessageContent.trim()) return;
+    if (!editedMessageContent.trim()) return;
 
     setMessages(prev => prev.map(m => 
       m.id === editingMessageId 
-        ? { ...m, content: editMessageContent, isEdited: true }
+        ? { ...m, content: editedMessageContent, isEdited: true }
         : m
     ));
 
     toast({ title: 'Сообщение изменено' });
-    setEditingMessageId(null);
-    setEditMessageContent('');
+    setEditingMessageId('');
+    setEditedMessageContent('');
   };
 
   const handleDeleteMessage = (messageId: string) => {
@@ -469,25 +520,26 @@ const Index = () => {
     const recipient = users.find(u => u.id === recipientId);
     if (!recipient) return;
 
-    setUsers(prev => prev.map(u => 
-      u.id === currentUserId 
-        ? { ...u, balance: u.balance - giftItem.price }
-        : u
-    ));
-
-    const transaction: GiftTransaction = {
+    const receivedGift: ReceivedGift = {
       id: Date.now().toString(),
       giftId: giftItem.id,
       giftName: giftItem.name,
       giftIcon: giftItem.icon,
+      giftPrice: giftItem.price,
       fromUserId: currentUser.id,
       fromUserName: currentUser.name,
-      toUserId: recipientId,
-      toUserName: recipient.name,
-      timestamp: new Date()
+      receivedAt: new Date()
     };
 
-    setGiftTransactions(prev => [...prev, transaction]);
+    setUsers(prev => prev.map(u => {
+      if (u.id === currentUserId) {
+        return { ...u, balance: u.balance - giftItem.price };
+      }
+      if (u.id === recipientId) {
+        return { ...u, receivedGifts: [...u.receivedGifts, receivedGift] };
+      }
+      return u;
+    }));
 
     toast({ 
       title: 'Подарок отправлен!', 
@@ -495,6 +547,96 @@ const Index = () => {
     });
     
     setIsGiftDialogOpen(false);
+  };
+
+  const handleSellGift = (giftId: string) => {
+    if (!currentUser) return;
+    
+    const gift = currentUser.receivedGifts.find(g => g.id === giftId);
+    if (!gift) return;
+
+    const daysSinceReceived = (Date.now() - new Date(gift.receivedAt).getTime()) / (1000 * 60 * 60 * 24);
+    
+    if (daysSinceReceived > 3) {
+      toast({ 
+        title: 'Нельзя продать', 
+        description: 'Прошло более 3 дней с получения подарка', 
+        variant: 'destructive' 
+      });
+      return;
+    }
+
+    const sellPrice = Math.floor(gift.giftPrice * 0.75);
+
+    setUsers(prev => prev.map(u => {
+      if (u.id === currentUserId) {
+        return {
+          ...u,
+          balance: u.balance + sellPrice,
+          receivedGifts: u.receivedGifts.filter(g => g.id !== giftId)
+        };
+      }
+      return u;
+    }));
+
+    toast({ 
+      title: 'Подарок продан!', 
+      description: `Вы получили ${sellPrice} ⊂⊃ (75% от ${gift.giftPrice} ⊂⊃)` 
+    });
+  };
+
+  const handleUploadAvatar = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast({ title: 'Ошибка', description: 'Выберите изображение', variant: 'destructive' });
+      return;
+    }
+
+    setUploadingAvatar(true);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const base64 = e.target?.result as string;
+      setUsers(prev => prev.map(u => 
+        u.id === currentUserId ? { ...u, avatar: base64 } : u
+      ));
+      setUploadingAvatar(false);
+      toast({ title: 'Аватарка обновлена!' });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleUploadImage = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast({ title: 'Ошибка', description: 'Выберите изображение', variant: 'destructive' });
+      return;
+    }
+
+    setUploadingImage(true);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const base64 = e.target?.result as string;
+      
+      const imageMessage: Message = {
+        id: Date.now().toString(),
+        userId: currentUser!.id,
+        userName: currentUser!.name,
+        userAvatar: currentUser!.avatar,
+        content: '🖼️ Изображение',
+        imageUrl: base64,
+        timestamp: new Date(),
+        channelId: selectedChannel
+      };
+
+      setMessages(prev => [...prev, imageMessage]);
+      setUploadingImage(false);
+      toast({ title: 'Изображение отправлено!' });
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleStartDM = (userId: string) => {
@@ -783,6 +925,59 @@ const Index = () => {
                         </ScrollArea>
                       </DialogContent>
                     </Dialog>
+                    <Dialog open={isReceivedGiftsOpen} onOpenChange={setIsReceivedGiftsOpen}>
+                      <DialogTrigger asChild>
+                        <Button variant="outline" className="w-full">
+                          <Icon name="Gift" size={16} className="mr-2" />
+                          Полученные подарки ({currentUser.receivedGifts.length})
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="glass-effect border-border/50 max-w-3xl">
+                        <DialogHeader>
+                          <DialogTitle className="text-primary neon-glow text-2xl">Полученные подарки</DialogTitle>
+                          <DialogDescription>Подарки можно продать в течении 3 дней за 75% стоимости</DialogDescription>
+                        </DialogHeader>
+                        <ScrollArea className="h-96 pr-4">
+                          {currentUser.receivedGifts.length === 0 ? (
+                            <div className="text-center py-12 text-muted-foreground">
+                              <Icon name="Gift" size={48} className="mx-auto mb-4 opacity-50" />
+                              <p>Подарков пока нет</p>
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-3 gap-4">
+                              {currentUser.receivedGifts.map(gift => {
+                                const daysSince = (Date.now() - new Date(gift.receivedAt).getTime()) / (1000 * 60 * 60 * 24);
+                                const canSell = daysSince <= 3;
+                                const sellPrice = Math.floor(gift.giftPrice * 0.75);
+                                
+                                return (
+                                  <Card key={gift.id} className="p-4 glass-effect border-primary/30">
+                                    <div className="text-center space-y-2">
+                                      <div className="text-4xl">{gift.giftIcon}</div>
+                                      <h3 className="font-semibold text-sm">{gift.giftName}</h3>
+                                      <p className="text-xs text-muted-foreground">От: {gift.fromUserName}</p>
+                                      <p className="text-xs text-primary">{gift.giftPrice} ⊂⊃</p>
+                                      {canSell ? (
+                                        <Button 
+                                          size="sm"
+                                          variant="outline"
+                                          className="w-full"
+                                          onClick={() => handleSellGift(gift.id)}
+                                        >
+                                          Продать за {sellPrice} ⊂⊃
+                                        </Button>
+                                      ) : (
+                                        <p className="text-xs text-muted-foreground">Нельзя продать</p>
+                                      )}
+                                    </div>
+                                  </Card>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </ScrollArea>
+                      </DialogContent>
+                    </Dialog>
                     <Dialog open={isEditProfileOpen} onOpenChange={setIsEditProfileOpen}>
                       <DialogTrigger asChild>
                         <Button 
@@ -802,6 +997,36 @@ const Index = () => {
                           <DialogTitle className="text-primary neon-glow">Редактировать профиль</DialogTitle>
                         </DialogHeader>
                         <div className="space-y-4 py-4">
+                          <div className="space-y-2">
+                            <Label>Аватарка</Label>
+                            <div className="flex items-center gap-4">
+                              <Avatar className={`w-20 h-20 ${currentUser.avatarFrame || 'ring-4 ring-primary/50'}`}>
+                                <AvatarImage src={currentUser.avatar} />
+                                <AvatarFallback className="bg-primary/20 text-primary text-2xl">
+                                  {currentUser.name[0]}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  id="avatar-upload"
+                                  className="hidden"
+                                  onChange={handleUploadAvatar}
+                                />
+                                <Button 
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => document.getElementById('avatar-upload')?.click()}
+                                  disabled={uploadingAvatar}
+                                >
+                                  {uploadingAvatar ? 'Загрузка...' : 'Выбрать файл'}
+                                </Button>
+                                <p className="text-xs text-muted-foreground mt-1">JPG, PNG, GIF</p>
+                              </div>
+                            </div>
+                          </div>
                           <div className="space-y-2">
                             <Label htmlFor="edit-name">Имя</Label>
                             <Input
@@ -1131,6 +1356,7 @@ const Index = () => {
                                       <SelectContent>
                                         <SelectItem value="user">Пользователь</SelectItem>
                                         <SelectItem value="observer">Наблюдатель</SelectItem>
+                                        <SelectItem value="helper">Помощник</SelectItem>
                                         <SelectItem value="moderator">Модератор</SelectItem>
                                         <SelectItem value="admin">Администратор</SelectItem>
                                       </SelectContent>
@@ -1324,8 +1550,8 @@ const Index = () => {
                   {editingMessageId === message.id ? (
                     <div className="space-y-2">
                       <Input
-                        value={editMessageContent}
-                        onChange={(e) => setEditMessageContent(e.target.value)}
+                        value={editedMessageContent}
+                        onChange={(e) => setEditedMessageContent(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && handleSaveEditMessage()}
                         className="bg-card/50"
                       />
@@ -1333,7 +1559,7 @@ const Index = () => {
                         <Button size="sm" onClick={handleSaveEditMessage} className="bg-primary hover:bg-primary/90">
                           Сохранить
                         </Button>
-                        <Button size="sm" variant="outline" onClick={() => setEditingMessageId(null)}>
+                        <Button size="sm" variant="outline" onClick={() => setEditingMessageId('')}>
                           Отмена
                         </Button>
                       </div>
@@ -1344,12 +1570,19 @@ const Index = () => {
                       {message.isEdited && (
                         <span className="text-xs text-muted-foreground ml-2">(изменено)</span>
                       )}
+                      {message.imageUrl && (
+                        <img 
+                          src={message.imageUrl} 
+                          alt="Attached" 
+                          className="mt-2 max-w-sm rounded-lg border border-primary/30"
+                        />
+                      )}
                     </div>
                   )}
                 </div>
                 {message.userId === currentUser.id && editingMessageId !== message.id && (
                   <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
-                    <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-card/50" onClick={() => handleEditMessage(message.id)}>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-card/50" onClick={() => handleEditMessage(message)}>
                       <Icon name="Edit" size={16} />
                     </Button>
                     <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/20" onClick={() => handleDeleteMessage(message.id)}>
@@ -1366,6 +1599,24 @@ const Index = () => {
                 )}
               </div>
             ))}
+            {selectedChannel === 'ai-helper' && aiThinking && (
+              <div className="flex gap-4">
+                <Avatar className="w-10 h-10">
+                  <AvatarFallback className="bg-primary/20 text-primary">
+                    🤖
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1">
+                  <div className="flex items-baseline gap-2 mb-1">
+                    <span className="font-semibold text-primary">AI Помощник</span>
+                  </div>
+                  <div className="text-sm bg-card/30 p-3 rounded-lg flex items-center gap-2">
+                    <Icon name="Loader2" size={16} className="animate-spin" />
+                    <span className="text-muted-foreground">Думаю...</span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </ScrollArea>
 
@@ -1385,6 +1636,23 @@ const Index = () => {
                   onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
                   className="flex-1 bg-card/50 border-border/50 focus:border-primary/50"
                 />
+                <input
+                  type="file"
+                  accept="image/*"
+                  id="chat-image-upload"
+                  className="hidden"
+                  onChange={handleUploadImage}
+                />
+                <Button 
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => document.getElementById('chat-image-upload')?.click()}
+                  disabled={uploadingImage || (selectedChannelInfo?.isAdminOnly && !['admin'].includes(currentUser.role))}
+                  className="hover:bg-primary/20"
+                >
+                  <Icon name={uploadingImage ? "Loader2" : "ImagePlus"} size={18} className={uploadingImage ? "animate-spin" : ""} />
+                </Button>
                 <Button 
                   onClick={handleSendMessage}
                   className="bg-primary hover:bg-primary/90 neon-border"
